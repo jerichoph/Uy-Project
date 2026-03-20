@@ -3,7 +3,7 @@ include "database.php";
 include "crypto.php";
 
 /* ID of the admin account to encrypt/update */
-$admin_id = 1; // change if needed
+$admin_id = 1;
 
 /* Fetch existing admin data */
 $stmt = $conn->prepare("SELECT * FROM admins WHERE id=?");
@@ -20,8 +20,8 @@ $admin = $result->fetch_assoc();
 /* Encrypt email */
 $enc_email = encryptData($admin["email"]);
 
-/* Set a username for login (replace 'admin' with your desired username) and encrypt it */
-$admin_username = "admin"; // the login username you want
+/* Set a username for */
+$admin_username = "admin";
 $enc_username = encryptData($admin_username);
 
 /* Update the admin account with encrypted username and email */

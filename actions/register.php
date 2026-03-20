@@ -3,80 +3,96 @@ session_start();
 include "database.php";
 include "crypto.php";
 
-if(isset($_POST["username"], $_POST["email"], $_POST["password"])){
+if($_SERVER["REQUEST_METHOD"] !== "POST"){
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    $username = trim($_POST["username"]);
-    $email = trim($_POST["email"]);
-    $phone = trim($_POST["phone"] ?? '');
-    $password = $_POST["password"];
+$username = filter_input(INPUT_POST, "username", FILTER_SANITIZE_SPECIAL_CHARS);
+$email = filter_input(INPUT_POST, "email", FILTER_SANITIZE_EMAIL);
+$phone = filter_input(INPUT_POST, "phone", FILTER_SANITIZE_SPECIAL_CHARS);
+$password = filter_input(INPUT_POST, "password", FILTER_UNSAFE_RAW);
 
-    /* Validate password length */
-    if(strlen($password) < 8){
-        $_SESSION["error"] = "Password must be at least 8 characters.";
-        header("Location: ../templates/register.php");
-        exit();
-    }
+$username = trim($username ?? "");
+$email = trim($email ?? "");
+$phone = trim($phone ?? "");
+$password = trim($password ?? "");
 
-    /* Require alphanumeric password */
-    if(!preg_match("/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$/", $password)){
-        $_SESSION["error"] = "Password must contain letters and numbers only.";
-        header("Location: ../templates/register.php");
-        exit();
-    }
+if($username === "" || $email === "" || $password === ""){
+    $_SESSION["reg_error"] = "Please fill in all required fields.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    /* Encrypt fields for comparison */
-    $enc_email = encryptData($email);
-    $enc_username = encryptData($username);
-    $enc_phone = encryptData($phone);
+if(!preg_match("/^[A-Za-z0-9]+$/", $username)){
+    $_SESSION["reg_error"] = "Username must be alphanumeric only.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    // Check if email already exists
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email=?");
-    $stmt->bind_param("s", $enc_email);
-    $stmt->execute();
-    $result = $stmt->get_result();
+if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
+    $_SESSION["reg_error"] = "Invalid email format.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    if($result->num_rows > 0){
-        $_SESSION["error"] = "Email already exists!";
-        header("Location: ../templates/register.php");
-        exit();
-    }
+if(strlen($password) < 8){
+    $_SESSION["reg_error"] = "Password must be at least 8 characters.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    // Check if username already exists
-    $stmt2 = $conn->prepare("SELECT * FROM users WHERE username=?");
-    $stmt2->bind_param("s", $enc_username);
-    $stmt2->execute();
-    $res2 = $stmt2->get_result();
+if(!preg_match("/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$/", $password)){
+    $_SESSION["reg_error"] = "Password must contain letters and numbers only.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    if($res2->num_rows > 0){
-        $_SESSION["error"] = "Username already exists!";
-        header("Location: ../templates/register.php");
-        exit();
-    }
+if(!empty($phone) && !preg_match("/^[0-9]+$/", $phone)){
+    $_SESSION["reg_error"] = "Phone number must contain numbers only.";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    // Check if phone already exists (optional if phone is required to be unique)
-    if(!empty($phone)){
-        $stmt3 = $conn->prepare("SELECT * FROM users WHERE phone=?");
-        $stmt3->bind_param("s", $enc_phone);
-        $stmt3->execute();
-        $res3 = $stmt3->get_result();
+$enc_username = encryptData($username);
+$enc_email = encryptData($email);
+$enc_phone = encryptData($phone);
 
-        if($res3->num_rows > 0){
-            $_SESSION["error"] = "Phone number already exists!";
-            header("Location: ../templates/register.php");
-            exit();
-        }
-    }
+$stmt = $conn->prepare("SELECT id FROM users WHERE email=?");
+$stmt->bind_param("s", $enc_email);
+$stmt->execute();
+$result = $stmt->get_result();
 
-    /* Hash password */
-    $password_hash = password_hash($password, PASSWORD_DEFAULT);
+if($result->num_rows > 0){
+    $_SESSION["reg_error"] = "Email already exists!";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
 
-    /* Insert user into DB */
-    $stmt4 = $conn->prepare("INSERT INTO users (username,email,phone,password) VALUES (?,?,?,?)");
-    $stmt4->bind_param("ssss",$enc_username,$enc_email,$enc_phone,$password_hash);
-    $stmt4->execute();
+$stmt2 = $conn->prepare("SELECT id FROM users WHERE username=?");
+$stmt2->bind_param("s", $enc_username);
+$stmt2->execute();
+$res2 = $stmt2->get_result();
 
-    $_SESSION["success"] = "Registered Successfully!";
-    header("Location: ../templates/user_login.php");
+if($res2->num_rows > 0){
+    $_SESSION["reg_error"] = "Username already exists!";
+    header("Location: /CampusMart/index.php");
+    exit();
+}
+
+$password_hash = password_hash($password, PASSWORD_DEFAULT);
+
+$stmt4 = $conn->prepare("INSERT INTO users (username,email,phone,password) VALUES (?,?,?,?)");
+$stmt4->bind_param("ssss", $enc_username, $enc_email, $enc_phone, $password_hash);
+$stmt4->execute();
+
+if ($registration_successful) {
+    $_SESSION['success'] = "Account created! You can now login.";
+    header("Location: /CampusMart/index.php");
+    exit();
+} else {
+    $_SESSION['reg_error'] = "Something went wrong.";
+    header("Location: /CampusMart/index.php");
     exit();
 }
 ?>
